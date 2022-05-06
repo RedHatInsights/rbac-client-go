@@ -28,7 +28,7 @@ func (c *Client) GetAccess(ctx context.Context, identity string, username string
 	req.Header.Set(identityHeader, identity)
 
 	var access AccessList
-	err = c.getParsed(req, &access)
+	err = c.listParsed(req, &access)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get permitted access: %w", err)
 	}
