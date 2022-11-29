@@ -2,6 +2,9 @@ package rbac
 
 import (
 	"context"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -71,9 +74,16 @@ func TestGetAccess(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			sr := tracetest.NewSpanRecorder()
+			provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
+
+			tracer := provider.Tracer("access-test")
+			newCtx, span := tracer.Start(context.Background(), "name")
+			defer span.End()
+
 			mockBody = &tc.respBody
 			mockStatus = &tc.respStatus
-			got, err := c.GetAccess(context.Background(), "", "")
+			got, err := c.GetAccess(newCtx, "", "")
 
 			if tc.ok {
 				assert.NoError(t, err)
@@ -81,6 +91,20 @@ func TestGetAccess(t *testing.T) {
 				assert.Error(t, err)
 			}
 			assert.Equal(t, tc.expected, got)
+
+			spans := sr.Ended()
+			assert.True(t, spans != nil)
+
+			assert.Equal(t, 1, len(spans))
+			s := spans[0]
+			att := s.Attributes()
+			assert.Equal(t, trace.SpanKindClient, s.SpanKind())
+			assert.Equal(t, s.InstrumentationScope().Name, "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp")
+			for _, a := range att {
+				if a.Key == "http.method" {
+					assert.Equal(t, "GET", a.Value.AsString())
+				}
+			}
 		})
 	}
 }
