@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -23,7 +24,8 @@ type Client struct {
 func NewClient(baseURL, application string) Client {
 	return Client{
 		HTTPClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:   30 * time.Second,
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
 		},
 		BaseURL:     baseURL,
 		Application: application,
